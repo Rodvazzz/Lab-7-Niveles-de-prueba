@@ -36,8 +36,8 @@ def library_init():
     enrique = user.User("Max","ID002")
     library1 = library.Library()
 
-    library1.add_book(book1, book2)
-    library1.add_user(miguel, enrique)
+    library1.add_book(book1)
+    library1.add_user(miguel)
 
     return library1
 
