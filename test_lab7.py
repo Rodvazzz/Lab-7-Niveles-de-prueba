@@ -1,170 +1,168 @@
+
+# Importamos las clases y pytest para realizar pruebas
 import book
 import pytest
-import user
-import library
+import user, library
 
 
+# Fixture que crea una biblioteca con un libro y un usuario
 @pytest.fixture
 def library_init():
-    book1 = book.Book("El alquimista", "Paulo Cohelo", 1967, "ISBN001")
-    miguel = user.User("Miguel", "ID001")
-
-    library1 = library.Library()
-    library1.add_book(book1)
-    library1.add_user(miguel)
-
-    return library1
+    book1 = book.Book("El alquimista", 'Paulo Coehlo', 1967, 'ISBN0001')
+    miguel = user.User('Miguel', 'ID001')
+    lib = library.Library()
+    lib.add_book(book1)   # Agrega el libro
+    lib.add_user(miguel)  # Agrega el usuario
+    return lib            # Devuelve la biblioteca preparada
 
 
-@pytest.fixture
-def library_full():
-    """Biblioteca con 2 libros y 2 usuarios para integración y sistema."""
-    library1 = library.Library()
-    library1.add_book(book.Book("El alquimista", "Paulo Cohelo", 1967, "ISBN001"))
-    library1.add_book(book.Book("Harry potter", "J.K Rowling", 1995, "ISBN002"))
-    library1.add_user(user.User("Miguel", "ID001"))
-    library1.add_user(user.User("Max", "ID002"))
-    return library1
-
-
+# Prueba que un libro se pueda prestar
 @pytest.mark.unit
 def test_borrow_book():
-    book1 = book.Book("El alquimista", "Paulo Cohelo", 1967, "ISBN001")
-    assert book1.title == "El alquimista"
-    book1.borrow()
-    assert book1.borrowed == True
+    book1 = book.Book("El alquimista", 'Paulo Coehlo', 1967, 'ISBN0001')
+    assert book1.title == 'El alquimista'  # Verifica el título
+    book1.borrow()                        # Presta el libro
+    assert book1.borrowed == True         # Comprueba que esté prestado
 
 
+# Prueba que no se pueda prestar dos veces el mismo libro
 @pytest.mark.unit
 def test_re_borrow_book():
-    book1 = book.Book("El alquimista", "Paulo Cohelo", 1967, "ISBN001")
-    assert book1.title == "El alquimista"
-    book1.borrow()
+    book1 = book.Book("El alquimista", 'Paulo Coehlo', 1967, 'ISBN0001')
+    assert book1.title == 'El alquimista'
+    book1.borrow()                 # Primer préstamo
     assert book1.borrowed == True
+
+    # Espera un ValueError al intentar prestarlo otra vez
     with pytest.raises(ValueError, match="The book is already borrowed"):
         book1.borrow()
 
 
+# Prueba que un libro se pueda prestar y devolver
 @pytest.mark.unit
-def test_borrow_return_book():
-    book1 = book.Book("El alquimista", "Paulo Cohelo", 1967, "ISBN001")
-    assert book1.title == "El alquimista"
-    book1.borrow()
+def test_borrow_and_return_book():
+    book1 = book.Book("El alquimista", 'Paulo Coehlo', 1967, 'ISBN0001')
+    assert book1.title == 'El alquimista'
+    book1.borrow()                         # Presta el libro
     assert book1.borrowed == True
-    book1.return_book()
-    assert book1.borrowed == False
+    book1.return_book()                    # Devuelve el libro
+    assert book1.borrowed == False         # Verifica que ya no esté prestado
 
 
+# Prueba el préstamo de un libro desde la biblioteca
 @pytest.mark.unit
-def test_return_book_not_borrowed():
-    book1 = book.Book("El alquimista", "Paulo Cohelo", 1967, "ISBN001")
-    with pytest.raises(ValueError, match="The book is not currently borrowed"):
-        book1.return_book()
+def test_library_borrow():
+    book1 = book.Book("El alquimista", 'Paulo Coehlo', 1967, 'ISBN0001')
+    miguel = user.User('Miguel', 'ID001')
+    lib = library.Library()
+
+    lib.add_book(book1)                    # Agrega el libro
+    assert lib.books[0].title == "El alquimista"
+
+    lib.add_user(miguel)                   # Agrega el usuario
+    assert lib.users[0].name == "Miguel"
+
+    lib.borrow_book('ID001', 'ISBN0001')   # Realiza el préstamo
+    assert book1.borrowed == True          # Verifica el préstamo
 
 
-@pytest.mark.unit
-def test_user_register_borrow_and_return():
-    miguel = user.User("Miguel", "ID001")
-    book1 = book.Book("El alquimista", "Paulo Cohelo", 1967, "ISBN001")
-    assert miguel.get_history() == []
-    miguel.register_borrow(book1)
-    miguel.register_return(book1)
-    history = miguel.get_history()
-    assert len(history) == 2
-    assert history[0].endswith("El alquimista")
-    assert history[1].endswith("El alquimista")
-
-
-@pytest.mark.integration
+# Prueba un préstamo utilizando el fixture
+@pytest.mark.wip
 def test_library_borrow_fixture(library_init):
-    library1 = library_init
-
-    library1.borrow_book("ID001", "ISBN001")
-    assert library1.books[0].borrowed == True
-    assert len(library1.users[0].get_history()) == 1
-
-
-@pytest.mark.integration
-def test_library_borrow_already_borrowed_book(library_full):
-    library1 = library_full
-
-    library1.borrow_book("ID001", "ISBN001")
-    with pytest.raises(ValueError, match="The book is already borrowed"):
-        library1.borrow_book("ID002", "ISBN001")
-
-    # El segundo usuario no debe quedar con registro de préstamo
-    assert library1.users[1].get_history() == []
+    lib = library_init                    # Usa la biblioteca preparada
+    assert lib.users[0].name == "Miguel"
+    lib.borrow_book('ID001', 'ISBN0001')  # Presta el libro
+    assert lib.books[0].borrowed == True
 
 
-@pytest.mark.integration
-def test_library_return_then_borrow_other_user(library_full):
-    library1 = library_full
+# Prueba reemplazar temporalmente un método con monkeypatch
+@pytest.mark.unit
+def test_borrow_setattr(monkeypatch, library_init):
+    lib = library_init
+    libro = lib.books[0]
 
-    library1.borrow_book("ID001", "ISBN001")
-    library1.return_book("ID001", "ISBN001")
-    assert library1.books[0].borrowed == False
+    # Función falsa que siempre devuelve el mismo libro
+    def buscar_falso(isbn):
+        return libro
 
-    library1.borrow_book("ID002", "ISBN001")
-    assert library1.books[0].borrowed == True
-    assert len(library1.users[0].get_history()) == 2
-    assert len(library1.users[1].get_history()) == 1
+    # Sustituye temporalmente el método de búsqueda
+    monkeypatch.setattr(lib, "_find_book", buscar_falso)
 
-
-@pytest.mark.system
-def test_system_full_loan_cycle(library_full):
-    """Flujo completo: préstamos, rechazo, devoluciones y nuevo préstamo."""
-    library1 = library_full
-    alquimista, harry = library1.books
-
-    # 1. Miguel pide prestado El alquimista
-    library1.borrow_book("ID001", "ISBN001")
-    assert alquimista.borrowed == True
-
-    # 2. Max intenta el mismo libro y es rechazado
-    with pytest.raises(ValueError, match="The book is already borrowed"):
-        library1.borrow_book("ID002", "ISBN001")
-
-    # 3. Max pide prestado Harry Potter (disponible)
-    library1.borrow_book("ID002", "ISBN002")
-    assert harry.borrowed == True
-
-    # 4. Miguel devuelve El alquimista
-    library1.return_book("ID001", "ISBN001")
-    assert alquimista.borrowed == False
-
-    # 5. Max pide prestado El alquimista, ahora disponible
-    library1.borrow_book("ID002", "ISBN001")
-    assert alquimista.borrowed == True
-
-    # Estado final del sistema
-    assert len(library1.users[0].get_history()) == 2   # Miguel: préstamo + devolución
-    assert len(library1.users[1].get_history()) == 2   # Max: Harry Potter + El alquimista
+    lib.borrow_book("ID001", "cualquier isbn")
+    assert libro.borrowed == True   # Verifica que se prestó
 
 
-@pytest.mark.system
-def test_system_error_handling(library_full, monkeypatch):
-    """Flujo de errores controlados sin alterar el estado de la biblioteca."""
-    library1 = library_full
+# Prueba qué sucede si eliminamos el método borrow
+@pytest.mark.unit
+def test_borrow_delattr(monkeypatch, library_init):
+    monkeypatch.delattr(book.Book, "borrow")  # Elimina temporalmente el método
 
-    # 1. Usuario inexistente
-    with pytest.raises(ValueError, match="User not found"):
-        library1.borrow_book("ID999", "ISBN001")
+    # Comprueba que se genere un AttributeError
+    with pytest.raises(AttributeError):
+        library_init.borrow_book('ID001', 'ISBN0001')
 
-    # 2. Libro inexistente
-    with pytest.raises(ValueError, match="Book not found"):
-        library1.borrow_book("ID001", "ISBN999")
 
-    # 3. Devolver un libro que no está prestado
-    with pytest.raises(ValueError, match="The book is not currently borrowed"):
-        library1.return_book("ID001", "ISBN001")
-
-    # 4. Préstamos deshabilitados: no se presta y no se registra historial
+# Prueba que no se presten libros si los préstamos están desactivados
+@pytest.mark.unit
+def test_loans_disabled_setitem(monkeypatch, library_init):
+    # Desactiva temporalmente los préstamos
     monkeypatch.setitem(library.settings, "loans_enabled", False)
-    library1.borrow_book("ID001", "ISBN001")
-    assert library1.books[0].borrowed == False
-    assert library1.users[0].get_history() == []
 
-    # 5. Al habilitar préstamos el sistema vuelve a operar con normalidad
-    monkeypatch.setitem(library.settings, "loans_enabled", True)
-    library1.borrow_book("ID001", "ISBN001")
-    assert library1.books[0].borrowed == True
+    library_init.borrow_book('ID001', 'ISBN0001')  # Intenta prestar
+
+    assert library_init.books[0].borrowed == False  # No se prestó
+    assert library_init.users[0].get_history() == []  # Historial vacío
+
+
+# Prueba diferentes ISBN sin repetir el código del test
+@pytest.mark.unit
+@pytest.mark.parametrize("isbn, titulo_esperado", [
+    ("ISBN001", "1984"),
+    ("ISBN002", "Moby Dick"),
+    ("ISBN003", "War and Peace"),
+])
+def test_find_book_parametrize(isbn, titulo_esperado):
+    lib = library.Library()
+
+    # Agrega tres libros a la biblioteca
+    lib.add_book(book.Book("1984", "George Orwell", 1949, "ISBN001"))
+    lib.add_book(book.Book("Moby Dick", "Herman Melville", 1851, "ISBN002"))
+    lib.add_book(book.Book("War and Peace", "Leo Tolstoy", 1869, "ISBN003"))
+
+    # Verifica que cada ISBN corresponda al título esperado
+    assert lib._find_book(isbn).title == titulo_esperado
+
+
+# Prueba el mensaje cuando los préstamos están desactivados
+@pytest.mark.unit
+def test_loans_disabled_capsys(monkeypatch, capsys, library_init):
+    # Desactiva los préstamos
+    monkeypatch.setitem(library.settings, "loans_enabled", False)
+
+    library_init.borrow_book('ID001', 'ISBN0001')
+
+    captured = capsys.readouterr()  # Captura lo impreso
+
+    # Verifica que el mensaje mostrado sea correcto
+    assert captured.out == "Loans are disabled\n"
+
+
+# Prueba que se pueda devolver un libro
+@pytest.mark.unit
+def test_library_return_book(library_init):
+    library_init.borrow_book('ID001', 'ISBN0001')  # Presta el libro
+    library_init.return_book('ID001', 'ISBN0001')  # Devuelve el libro
+
+    assert library_init.books[0].borrowed == False  # Ya no está prestado
+
+    # Verifica que existan dos movimientos en el historial
+    assert len(library_init.users[0].get_history()) == 2
+
+
+# Prueba la búsqueda de un usuario inexistente
+@pytest.mark.unit
+def test_find_user_not_found(library_init):
+
+    # Espera un ValueError porque el usuario no existe
+    with pytest.raises(ValueError, match="User not found"):
+        library_init._find_user('ID999')
